@@ -177,36 +177,35 @@ const MapDemo = () => {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   
+                  {route.length > 0 && <MapBounds route={route} />}
+                  
                   {route.length > 0 && (
-                    <>
-                      <MapBounds route={route} />
-                      
-                      {/* Route line */}
-                      <Polyline
-                        positions={route}
-                        color="#10b981"
-                        weight={6}
-                        opacity={0.8}
-                      />
-                      
-                      {/* Start marker (Ambulance) */}
-                      <Marker position={route[0]} icon={ambulanceIcon}>
-                        <Popup>
-                          <strong>🚑 Ambulância</strong>
-                          <br />
-                          Jardim Vera Cruz
-                        </Popup>
-                      </Marker>
-                      
-                      {/* End marker (Hospital) */}
-                      <Marker position={route[route.length - 1]} icon={hospitalIcon}>
-                        <Popup>
-                          <strong>🏥 Hospital</strong>
-                          <br />
-                          Região Central
-                        </Popup>
-                      </Marker>
-                    </>
+                    <Polyline
+                      positions={route}
+                      color="#10b981"
+                      weight={6}
+                      opacity={0.8}
+                    />
+                  )}
+                  
+                  {route.length > 0 && (
+                    <Marker position={route[0]} icon={ambulanceIcon}>
+                      <Popup>
+                        <strong>🚑 Ambulância</strong>
+                        <br />
+                        Jardim Vera Cruz
+                      </Popup>
+                    </Marker>
+                  )}
+                  
+                  {route.length > 0 && (
+                    <Marker position={route[route.length - 1]} icon={hospitalIcon}>
+                      <Popup>
+                        <strong>🏥 Hospital</strong>
+                        <br />
+                        Região Central
+                      </Popup>
+                    </Marker>
                   )}
                 </MapContainer>
                 
