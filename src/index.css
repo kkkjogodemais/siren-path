@@ -154,6 +154,7 @@ All colors MUST be HSL.
   /* Leaflet map customization */
   .leaflet-container {
     font-family: inherit;
+    z-index: 0;
   }
 
   .leaflet-popup-content-wrapper {
@@ -162,5 +163,11 @@ All colors MUST be HSL.
 
   .leaflet-popup-content {
     @apply text-sm;
+  }
+
+  .custom-ambulance-icon,
+  .custom-hospital-icon {
+    background: transparent !important;
+    border: none !important;
   }
 }

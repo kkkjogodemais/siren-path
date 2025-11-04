@@ -2,10 +2,25 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Navigation, Clock, Activity, MapPin, Map } from 'lucide-react';
+import { Navigation, Clock, Activity, MapPin } from 'lucide-react';
+import SorocabaMap from './SorocabaMap';
+
+// Criar rota simulada em Sorocaba
+const createRouteInSorocaba = (): [number, number][] => {
+  return [
+    [-23.5180, -47.4680], // Ambulância - Região do Jardim Vera Cruz
+    [-23.5140, -47.4620],
+    [-23.5100, -47.4580],
+    [-23.5060, -47.4540],
+    [-23.5020, -47.4500],
+    [-23.4980, -47.4460],
+    [-23.4950, -47.4420], // Hospital - Região Central
+  ];
+};
 
 const MapDemo = () => {
   const [isCalculating, setIsCalculating] = useState(false);
+  const [route, setRoute] = useState<[number, number][]>([]);
   const [routeInfo, setRouteInfo] = useState<{
     distance: number;
     time: number;
@@ -16,16 +31,45 @@ const MapDemo = () => {
     simulateRoute();
   }, []);
 
+  const calculateDistance = (coords: [number, number][]): number => {
+    let total = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const [lat1, lon1] = coords[i];
+      const [lat2, lon2] = coords[i + 1];
+      
+      // Haversine formula
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      total += R * c;
+    }
+    return total;
+  };
+
   const simulateRoute = () => {
     setIsCalculating(true);
+    setRoute([]);
     setRouteInfo(null);
     
     setTimeout(() => {
+      const newRoute = createRouteInSorocaba();
+      setRoute(newRoute);
+      
+      const distance = calculateDistance(newRoute);
       const congestionLevel: 'low' | 'medium' | 'high' = Math.random() > 0.7 ? 'medium' : 'low';
+      const baseTime = (distance / 40) * 60; // 40 km/h average
+      const adjustedTime = congestionLevel === 'medium' ? baseTime * 1.3 : baseTime;
       
       setRouteInfo({
-        distance: 4.2,
-        time: 8,
+        distance: Number(distance.toFixed(1)),
+        time: Math.round(adjustedTime),
         congestionLevel
       });
       setIsCalculating(false);
@@ -64,21 +108,10 @@ const MapDemo = () => {
 
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-              <Card className="overflow-hidden h-[500px] relative bg-gradient-to-br from-muted/50 to-muted">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <Map className="h-24 w-24 mx-auto text-muted-foreground/50" />
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">Mapa Interativo</h3>
-                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                        A visualização do mapa de Sorocaba com rota da ambulância será integrada em breve.<br/>
-                        OpenStreetMap gratuito será usado.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <Card className="overflow-hidden h-[500px] relative">
+                <SorocabaMap route={route} />
                 
-                <div className="absolute bottom-4 left-4 z-10 bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+                <div className="absolute bottom-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg pointer-events-none">
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="h-4 w-4 text-primary" />
                     <span className="font-semibold">Sorocaba, São Paulo</span>
