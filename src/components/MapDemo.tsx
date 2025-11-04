@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Navigation, Clock, Activity, AlertTriangle } from 'lucide-react';
+import { Navigation, Clock, Activity } from 'lucide-react';
 
 // São Paulo coordinates
 const SAO_PAULO_CENTER: [number, number] = [-46.6333, -23.5505];
@@ -22,9 +22,9 @@ const MapDemo = () => {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Initialize map with a public token placeholder
-    // Users will need to add their own Mapbox token
-    mapboxgl.accessToken = 'pk.eyJ1IjoibG92YWJsZSIsImEiOiJjbTN6ZDRzOHQwMDBoMnFzOWRpaXUyczdwIn0.example';
+    // ADICIONE SEU TOKEN PÚBLICO DO MAPBOX AQUI
+    // Obtenha gratuitamente em: https://account.mapbox.com/access-tokens/
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'SEU_TOKEN_AQUI';
     
     try {
       map.current = new mapboxgl.Map({
@@ -151,14 +151,6 @@ const MapDemo = () => {
             <div className="md:col-span-2">
               <Card className="overflow-hidden h-[500px] relative">
                 <div ref={mapContainer} className="absolute inset-0" />
-                
-                {/* Mapbox token notice */}
-                <div className="absolute top-4 left-4 right-4 z-10">
-                  <div className="bg-warning/90 backdrop-blur-sm border border-warning-foreground/20 rounded-lg p-3 text-sm">
-                    <AlertTriangle className="h-4 w-4 inline mr-2" />
-                    <strong>Demo Mode:</strong> Add your Mapbox token for full functionality
-                  </div>
-                </div>
               </Card>
             </div>
 
