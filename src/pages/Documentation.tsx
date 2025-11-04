@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Target, Heart, TrendingUp, Code, Users } from "lucide-react";
 import { Link } from "react-router-dom";
+import facensLogo from "@/assets/facens-logo.png";
 
 const Documentation = () => {
   const developers = [
@@ -28,12 +29,19 @@ const Documentation = () => {
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-6">
-          <Link to="/">
-            <Button variant="ghost" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para Home
-            </Button>
-          </Link>
+          <div className="flex items-center justify-between">
+            <Link to="/">
+              <Button variant="ghost" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para Home
+              </Button>
+            </Link>
+            <img 
+              src={facensLogo} 
+              alt="Facens" 
+              className="h-10 object-contain"
+            />
+          </div>
         </div>
       </header>
 
@@ -200,9 +208,19 @@ const Documentation = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground">
+                  <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-center justify-center gap-4 mb-3">
+                      <img 
+                        src={facensLogo} 
+                        alt="Facens" 
+                        className="h-12 object-contain"
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground text-center">
                       Projeto desenvolvido com dedicação e comprometimento com a inovação em serviços de emergência
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Facens - Faculdade de Engenharia de Sorocaba
                     </p>
                   </div>
                 </div>

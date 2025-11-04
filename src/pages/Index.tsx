@@ -5,6 +5,7 @@ import TechStack from "@/components/TechStack";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Github, FileText, Mail } from "lucide-react";
+import facensLogo from "@/assets/facens-logo.png";
 
 const Index = () => {
   return (
@@ -45,46 +46,59 @@ const Index = () => {
       {/* Footer */}
       <footer className="bg-card border-t py-12">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="font-semibold mb-4">Plataforma</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Recursos</li>
-                <li>Preços</li>
-                <li>Casos de Uso</li>
-                <li>Integrações</li>
-              </ul>
+          <div className="max-w-6xl mx-auto">
+            {/* Facens Logo */}
+            <div className="flex justify-center mb-8 pb-8 border-b">
+              <img 
+                src={facensLogo} 
+                alt="Facens - Faculdade de Engenharia de Sorocaba" 
+                className="h-16 object-contain"
+              />
             </div>
-            <div>
-              <h3 className="font-semibold mb-4">Desenvolvedores</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Documentação</li>
-                <li>API Reference</li>
-                <li>SDKs</li>
-                <li>Status</li>
-              </ul>
+            
+            <div className="grid md:grid-cols-4 gap-8">
+              <div>
+                <h3 className="font-semibold mb-4">Plataforma</h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>Recursos</li>
+                  <li>Preços</li>
+                  <li>Casos de Uso</li>
+                  <li>Integrações</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-4">Desenvolvedores</h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>Documentação</li>
+                  <li>API Reference</li>
+                  <li>SDKs</li>
+                  <li>Status</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-4">Empresa</h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>Sobre</li>
+                  <li>Blog</li>
+                  <li>Carreiras</li>
+                  <li>Contato</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-4">Legal</h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>Privacidade</li>
+                  <li>Termos</li>
+                  <li>Segurança</li>
+                  <li>LGPD</li>
+                </ul>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold mb-4">Empresa</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Sobre</li>
-                <li>Blog</li>
-                <li>Carreiras</li>
-                <li>Contato</li>
-              </ul>
+            
+            <div className="max-w-6xl mx-auto mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
+              <p className="mb-2">© 2025 Plataforma de Roteamento Inteligente. Salvando vidas com tecnologia.</p>
+              <p className="text-xs">Projeto Acadêmico - Facens - Faculdade de Engenharia de Sorocaba</p>
             </div>
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Privacidade</li>
-                <li>Termos</li>
-                <li>Segurança</li>
-                <li>LGPD</li>
-              </ul>
-            </div>
-          </div>
-          <div className="max-w-6xl mx-auto mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
-            <p>© 2025 Plataforma de Roteamento Inteligente. Salvando vidas com tecnologia.</p>
           </div>
         </div>
       </footer>
