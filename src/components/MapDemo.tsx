@@ -1,77 +1,11 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Navigation, Clock, Activity, MapPin } from 'lucide-react';
-
-// Fix Leaflet default icon issue
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-
-L.Marker.prototype.options.icon = DefaultIcon;
-
-// Custom icons
-const ambulanceIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const hospitalIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Sorocaba center coordinates
-const SOROCABA_CENTER: [number, number] = [-23.5015, -47.4526];
-
-// Simulate a route in Sorocaba (from a neighborhood to a hospital)
-const createRouteInSorocaba = (): [number, number][] => {
-  return [
-    [-23.5180, -47.4680], // Ambulância - Região do Jardim Vera Cruz
-    [-23.5140, -47.4620],
-    [-23.5100, -47.4580],
-    [-23.5060, -47.4540],
-    [-23.5020, -47.4500],
-    [-23.4980, -47.4460],
-    [-23.4950, -47.4420], // Hospital - Região Central
-  ];
-};
-
-// Component to fit bounds when route changes
-const MapBounds = ({ route }: { route: [number, number][] }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (route.length > 0) {
-      const bounds = L.latLngBounds(route);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [route, map]);
-  
-  return null;
-};
+import { Navigation, Clock, Activity, MapPin, Map } from 'lucide-react';
 
 const MapDemo = () => {
   const [isCalculating, setIsCalculating] = useState(false);
-  const [route, setRoute] = useState<[number, number][]>([]);
   const [routeInfo, setRouteInfo] = useState<{
     distance: number;
     time: number;
@@ -79,55 +13,23 @@ const MapDemo = () => {
   } | null>(null);
 
   useEffect(() => {
-    // Simulate initial route calculation
     simulateRoute();
   }, []);
 
   const simulateRoute = () => {
     setIsCalculating(true);
-    setRoute([]);
     setRouteInfo(null);
     
-    // Simulate route calculation delay
     setTimeout(() => {
-      const newRoute = createRouteInSorocaba();
-      setRoute(newRoute);
-      
-      // Calculate approximate distance (simplified)
-      const distance = calculateDistance(newRoute);
       const congestionLevel: 'low' | 'medium' | 'high' = Math.random() > 0.7 ? 'medium' : 'low';
-      const baseTime = (distance / 40) * 60; // 40 km/h average
-      const adjustedTime = congestionLevel === 'medium' ? baseTime * 1.3 : baseTime;
       
       setRouteInfo({
-        distance: Number(distance.toFixed(1)),
-        time: Math.round(adjustedTime),
+        distance: 4.2,
+        time: 8,
         congestionLevel
       });
       setIsCalculating(false);
     }, 1500);
-  };
-
-  const calculateDistance = (coords: [number, number][]): number => {
-    let total = 0;
-    for (let i = 0; i < coords.length - 1; i++) {
-      const [lat1, lon1] = coords[i];
-      const [lat2, lon2] = coords[i + 1];
-      
-      // Haversine formula (simplified)
-      const R = 6371; // Earth radius in km
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLon = ((lon2 - lon1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      total += R * c;
-    }
-    return total;
   };
 
   const getCongestionColor = (level: 'low' | 'medium' | 'high') => {
@@ -150,7 +52,6 @@ const MapDemo = () => {
     <section id="platform-demo" className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
           <div className="text-center mb-12">
             <Badge className="mb-4">Demonstração Interativa - Sorocaba/SP</Badge>
             <h2 className="text-4xl font-bold mb-4">
@@ -161,56 +62,23 @@ const MapDemo = () => {
             </p>
           </div>
 
-          {/* Map and controls */}
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Map */}
             <div className="md:col-span-2">
-              <Card className="overflow-hidden h-[500px] relative">
-                <MapContainer
-                  center={SOROCABA_CENTER}
-                  zoom={13}
-                  style={{ height: '100%', width: '100%' }}
-                  className="z-0"
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  
-                  {route.length > 0 && <MapBounds route={route} />}
-                  
-                  {route.length > 0 && (
-                    <Polyline
-                      positions={route}
-                      color="#10b981"
-                      weight={6}
-                      opacity={0.8}
-                    />
-                  )}
-                  
-                  {route.length > 0 && (
-                    <Marker position={route[0]} icon={ambulanceIcon}>
-                      <Popup>
-                        <strong>🚑 Ambulância</strong>
-                        <br />
-                        Jardim Vera Cruz
-                      </Popup>
-                    </Marker>
-                  )}
-                  
-                  {route.length > 0 && (
-                    <Marker position={route[route.length - 1]} icon={hospitalIcon}>
-                      <Popup>
-                        <strong>🏥 Hospital</strong>
-                        <br />
-                        Região Central
-                      </Popup>
-                    </Marker>
-                  )}
-                </MapContainer>
+              <Card className="overflow-hidden h-[500px] relative bg-gradient-to-br from-muted/50 to-muted">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <Map className="h-24 w-24 mx-auto text-muted-foreground/50" />
+                    <div>
+                      <h3 className="text-xl font-semibold mb-2">Mapa Interativo</h3>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                        A visualização do mapa de Sorocaba com rota da ambulância será integrada em breve.<br/>
+                        OpenStreetMap gratuito será usado.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 
-                {/* Info badge */}
-                <div className="absolute bottom-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+                <div className="absolute bottom-4 left-4 z-10 bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="h-4 w-4 text-primary" />
                     <span className="font-semibold">Sorocaba, São Paulo</span>
@@ -220,7 +88,6 @@ const MapDemo = () => {
               </Card>
             </div>
 
-            {/* Controls and info */}
             <div className="space-y-6">
               <Card className="p-6">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
