@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Zap, MapPin, Brain } from "lucide-react";
+import { ArrowRight, MapPin, Brain, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Hero = () => {
   const scrollToDemo = () => {
@@ -53,13 +54,15 @@ const Hero = () => {
               Ver Demonstração
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-            >
-              Documentação Técnica
-            </Button>
+            <Link to="/documentacao">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm w-full"
+              >
+                Documentação Técnica
+              </Button>
+            </Link>
           </div>
 
           {/* Features preview */}
@@ -75,7 +78,7 @@ const Hero = () => {
               <p className="text-white/80 text-sm">Algoritmo Dijkstra com pesos ajustados em tempo real</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left">
-              <Zap className="h-10 w-10 text-white mb-4" />
+              <Activity className="h-10 w-10 text-white mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">Integração Pública</h3>
               <p className="text-white/80 text-sm">APIs para órgãos de trânsito e centrais de emergência</p>
             </div>
