@@ -15,12 +15,6 @@ const Hero = () => {
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto text-center space-y-8">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 text-sm text-white">
-            <Zap className="h-4 w-4" />
-            <span>Powered by AI & Real-time Data</span>
-          </div>
-
           {/* Main heading */}
           <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
             Salvando Vidas com
