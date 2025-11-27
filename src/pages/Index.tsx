@@ -1,10 +1,11 @@
+import { Link } from "react-router-dom";
 import Hero from "@/components/Hero";
 import MapDemo from "@/components/MapDemo";
 import Features from "@/components/Features";
 import TechStack from "@/components/TechStack";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Github, FileText, Mail } from "lucide-react";
+import { Github, FileText, Mail, Ambulance } from "lucide-react";
 import facensLogo from "@/assets/facens-logo.png";
 
 const Index = () => {
@@ -23,17 +24,25 @@ const Index = () => {
               Pronto para Transformar Operações de Emergência?
             </h2>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Entre em contato para agendar uma demonstração completa da plataforma ou acesse nossa documentação técnica.
+              Acesse a plataforma completa de roteamento ou entre em contato para agendar uma demonstração.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="gap-2">
+              <Link to="/plataforma">
+                <Button size="lg" className="gap-2 w-full sm:w-auto">
+                  <Ambulance className="h-5 w-5" />
+                  Acessar Plataforma
+                </Button>
+              </Link>
+              <Button size="lg" variant="outline" className="gap-2">
                 <Mail className="h-5 w-5" />
                 Contato Comercial
               </Button>
-              <Button size="lg" variant="outline" className="gap-2">
-                <FileText className="h-5 w-5" />
-                Documentação
-              </Button>
+              <Link to="/documentacao">
+                <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
+                  <FileText className="h-5 w-5" />
+                  Documentação
+                </Button>
+              </Link>
               <Button size="lg" variant="outline" className="gap-2">
                 <Github className="h-5 w-5" />
                 GitHub
@@ -60,8 +69,12 @@ const Index = () => {
               <div>
                 <h3 className="font-semibold mb-4">Plataforma</h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>
+                    <Link to="/plataforma" className="hover:text-foreground transition-colors">
+                      Simulador
+                    </Link>
+                  </li>
                   <li>Recursos</li>
-                  <li>Preços</li>
                   <li>Casos de Uso</li>
                   <li>Integrações</li>
                 </ul>
