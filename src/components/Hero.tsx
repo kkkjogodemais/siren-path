@@ -46,13 +46,22 @@ const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
+            <Link to="/plataforma">
+              <Button 
+                size="lg" 
+                className="bg-white text-primary hover:bg-white/90 shadow-lg w-full"
+              >
+                Acessar Plataforma
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
             <Button 
               size="lg" 
-              className="bg-white text-primary hover:bg-white/90 shadow-lg"
+              variant="outline" 
+              className="bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
               onClick={scrollToDemo}
             >
               Ver Demonstração
-              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Link to="/documentacao">
               <Button 
@@ -60,7 +69,7 @@ const Hero = () => {
                 variant="outline" 
                 className="bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm w-full"
               >
-                Documentação Técnica
+                Documentação
               </Button>
             </Link>
           </div>

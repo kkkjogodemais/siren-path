@@ -166,8 +166,55 @@ All colors MUST be HSL.
   }
 
   .custom-ambulance-icon,
-  .custom-hospital-icon {
+  .custom-hospital-icon,
+  .traffic-light-icon,
+  .destination-hospital-icon {
     background: transparent !important;
     border: none !important;
+  }
+
+  /* Animated route */
+  .animated-route {
+    stroke-dasharray: 10, 5;
+    animation: dash 1s linear infinite;
+  }
+
+  @keyframes dash {
+    to {
+      stroke-dashoffset: -15;
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes ambulance-pulse {
+    0%, 100% {
+      transform: scale(1);
+      filter: drop-shadow(0 2px 6px rgba(239, 68, 68, 0.5));
+    }
+    50% {
+      transform: scale(1.1);
+      filter: drop-shadow(0 4px 12px rgba(239, 68, 68, 0.8));
+    }
+  }
+
+  @keyframes destination-pulse {
+    0%, 100% {
+      transform: scale(1);
+      filter: drop-shadow(0 2px 8px rgba(34, 197, 94, 0.6));
+    }
+    50% {
+      transform: scale(1.15);
+      filter: drop-shadow(0 4px 16px rgba(34, 197, 94, 0.9));
+    }
   }
 }
