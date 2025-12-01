@@ -66,14 +66,51 @@ const DEMO_ROUTE: [number, number][] = [
   [-23.5156, -47.4389],
 ];
 
-// Dados da simulação
+// Dados da simulação - cálculos realistas
 const SIMULATION_CONFIG = {
   totalDistanceKm: 3.2,
-  estimatedTimeMinutes: 6.5,
-  averageSpeedKmh: 45,
+  // A 50km/h média: 3.2km / 50km/h = 0.064h = 3.84 minutos
+  estimatedTimeMinutes: 3.84,
+  averageSpeedKmh: 50,
   trafficLightsCount: 4,
   origin: 'Centro - Praça Fernando Prestes',
   destination: 'Hospital Regional de Sorocaba',
+};
+
+// Cálculo realista do intervalo entre pontos
+// 35 segmentos, 3.2km total = ~91m por segmento
+// A 50km/h = 13.89 m/s, cada segmento leva ~6.5 segundos
+const SEGMENT_COUNT = DEMO_ROUTE.length - 1;
+const METERS_PER_SEGMENT = (SIMULATION_CONFIG.totalDistanceKm * 1000) / SEGMENT_COUNT;
+
+// Função para calcular velocidade realista baseada na posição
+const getRealisticSpeed = (index: number): number => {
+  // Velocidades variam de 35-70 km/h em vias urbanas
+  // Com picos de até 100km/h em trechos livres (emergência)
+  
+  // Início mais lento (saindo do centro)
+  if (index < 5) return 35 + Math.random() * 10; // 35-45 km/h
+  
+  // Passando por semáforos (desaceleração/aceleração)
+  if (index === 11 || index === 12) return 25 + Math.random() * 15; // 25-40 km/h
+  if (index === 21 || index === 22) return 25 + Math.random() * 15; // 25-40 km/h
+  
+  // Trechos de avenida - pode acelerar mais
+  if (index > 15 && index < 20) return 60 + Math.random() * 20; // 60-80 km/h
+  if (index > 25 && index < 30) return 55 + Math.random() * 25; // 55-80 km/h
+  
+  // Aproximando do hospital - desacelera
+  if (index > 30) return 30 + Math.random() * 15; // 30-45 km/h
+  
+  // Velocidade normal
+  return 45 + Math.random() * 15; // 45-60 km/h
+};
+
+// Calcula o tempo em ms para percorrer um segmento dada a velocidade
+const getSegmentDuration = (speedKmh: number): number => {
+  const speedMs = (speedKmh * 1000) / 3600; // km/h para m/s
+  const timeSeconds = METERS_PER_SEGMENT / speedMs;
+  return timeSeconds * 1000; // converter para ms
 };
 
 const LiveDemoSimulation = () => {
@@ -84,8 +121,9 @@ const LiveDemoSimulation = () => {
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
   
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRunningRef = useRef(false);
 
   // Calcular métricas em tempo real
   const progress = (currentIndex / (DEMO_ROUTE.length - 1)) * 100;
@@ -104,7 +142,8 @@ const LiveDemoSimulation = () => {
 
   // Resetar simulação
   const resetSimulation = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    isRunningRef.current = false;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRunning(false);
     setCurrentIndex(0);
@@ -117,8 +156,11 @@ const LiveDemoSimulation = () => {
   // Iniciar simulação
   const startSimulation = useCallback(() => {
     resetSimulation();
-    setIsRunning(true);
-    setHasCompleted(false);
+    setTimeout(() => {
+      isRunningRef.current = true;
+      setIsRunning(true);
+      setHasCompleted(false);
+    }, 50);
   }, [resetSimulation]);
 
   // Auto-start após 2 segundos
@@ -132,49 +174,64 @@ const LiveDemoSimulation = () => {
     return () => clearTimeout(autoStartTimer);
   }, []);
 
+  // Função para avançar para o próximo ponto com timing realista
+  const scheduleNextMove = useCallback((fromIndex: number) => {
+    if (!isRunningRef.current || fromIndex >= DEMO_ROUTE.length - 1) {
+      return;
+    }
+
+    // Calcular velocidade realista para este segmento
+    const speed = getRealisticSpeed(fromIndex);
+    setCurrentSpeed(Math.round(speed));
+    
+    // Calcular duração deste segmento baseado na velocidade
+    const duration = getSegmentDuration(speed);
+    
+    timeoutRef.current = setTimeout(() => {
+      if (!isRunningRef.current) return;
+      
+      const nextIndex = fromIndex + 1;
+      setCurrentIndex(nextIndex);
+      
+      // Verificar semáforos passados
+      if (nextIndex === 12 || nextIndex === 22 || nextIndex === 28 || nextIndex === 32) {
+        setTrafficLightsCleared(t => Math.min(t + 1, SIMULATION_CONFIG.trafficLightsCount));
+      }
+      
+      // Verificar conclusão
+      if (nextIndex >= DEMO_ROUTE.length - 1) {
+        isRunningRef.current = false;
+        if (timerRef.current) clearInterval(timerRef.current);
+        setIsRunning(false);
+        setHasCompleted(true);
+        return;
+      }
+      
+      // Agendar próximo movimento
+      scheduleNextMove(nextIndex);
+    }, duration);
+  }, []);
+
   // Loop principal da simulação
   useEffect(() => {
     if (!isRunning) return;
 
-    // Timer para cronômetro
+    isRunningRef.current = true;
+    
+    // Timer para cronômetro (atualiza a cada 100ms)
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => prev + 0.1);
     }, 100);
 
-    // Intervalo de movimento da ambulância (velocidade realista)
-    // 500ms por ponto = movimento suave e realista
-    intervalRef.current = setInterval(() => {
-      setCurrentIndex(prev => {
-        const next = prev + 1;
-        
-        // Verificar semáforos passados
-        if (next === 12 || next === 22) {
-          setTrafficLightsCleared(t => t + 1);
-        }
-        
-        // Simular variação de velocidade
-        const baseSpeed = 45;
-        const variation = Math.sin(next * 0.3) * 10;
-        setCurrentSpeed(Math.round(baseSpeed + variation));
-        
-        // Verificar conclusão
-        if (next >= DEMO_ROUTE.length - 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          if (timerRef.current) clearInterval(timerRef.current);
-          setIsRunning(false);
-          setHasCompleted(true);
-          return DEMO_ROUTE.length - 1;
-        }
-        
-        return next;
-      });
-    }, 400); // 400ms = movimento suave e tempo total ~13s para a demo
+    // Iniciar a sequência de movimentos
+    scheduleNextMove(0);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      isRunningRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRunning]);
+  }, [isRunning, scheduleNextMove]);
 
   return (
     <section className="py-20 bg-gradient-to-b from-background to-muted/30">
