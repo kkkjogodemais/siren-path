@@ -39,14 +39,66 @@ import {
 
 interface RouteMetrics {
   distance: number;
+  distanceTraveled: number;
   estimatedTime: number;
   currentTime: number;
   trafficLightsCleared: number;
   totalTrafficLights: number;
   congestionLevel: 'low' | 'medium' | 'high';
+  currentSpeed: number;
   averageSpeed: number;
   progress: number;
 }
+
+// Função para calcular velocidade realista baseada no contexto
+const getRealisticAmbulanceSpeed = (
+  segmentIndex: number, 
+  totalSegments: number,
+  congestionLevel: 'low' | 'medium' | 'high',
+  isNearTrafficLight: boolean
+): number => {
+  // Velocidade base para ambulância em emergência: 50-80 km/h
+  let baseSpeed = 55;
+  
+  // Ajuste por congestionamento
+  const congestionFactor = {
+    low: 1.2,      // Pode ir mais rápido em tráfego leve
+    medium: 0.9,   // Reduz um pouco
+    high: 0.7      // Reduz significativamente
+  };
+  baseSpeed *= congestionFactor[congestionLevel];
+  
+  // Início da rota - acelera gradualmente (0-15% do trajeto)
+  if (segmentIndex < totalSegments * 0.15) {
+    baseSpeed *= 0.6 + (segmentIndex / (totalSegments * 0.15)) * 0.4;
+  }
+  
+  // Final da rota - desacelera para parar (últimos 10%)
+  if (segmentIndex > totalSegments * 0.9) {
+    const remaining = (totalSegments - segmentIndex) / (totalSegments * 0.1);
+    baseSpeed *= 0.4 + remaining * 0.6;
+  }
+  
+  // Perto de semáforo - desacelera e depois acelera
+  if (isNearTrafficLight) {
+    baseSpeed *= 0.7;
+  }
+  
+  // Variação aleatória realista (+/- 10%)
+  const variation = 0.9 + Math.random() * 0.2;
+  baseSpeed *= variation;
+  
+  // Limites: mínimo 25 km/h, máximo 90 km/h
+  return Math.max(25, Math.min(90, baseSpeed));
+};
+
+// Calcula o tempo em ms para percorrer um segmento
+const calculateSegmentTime = (distanceKm: number, speedKmh: number): number => {
+  // tempo (h) = distância (km) / velocidade (km/h)
+  // tempo (ms) = tempo (h) * 3600 * 1000
+  const timeHours = distanceKm / speedKmh;
+  return timeHours * 3600 * 1000;
+};
 
 const AmbulanceSimulator = () => {
   const [isSimulating, setIsSimulating] = useState(false);
@@ -62,8 +114,10 @@ const AmbulanceSimulator = () => {
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const [logs, setLogs] = useState<string[]>([]);
   
-  const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(0);
+  // Refs para simulação realista
+  const simulationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const simulatedTimeRef = useRef<number>(0); // Tempo simulado em segundos
+  const totalDistanceTraveledRef = useRef<number>(0);
 
   // Hook de dados de tráfego em tempo real
   const { trafficData, isLoading: isTrafficLoading, lastUpdate, refreshData, simulateSpike } = useTrafficData({
@@ -118,16 +172,19 @@ const AmbulanceSimulator = () => {
     setTrafficLightsOnRoute(lightsOnRoute);
     setRouteMetrics({
       distance: Number(distance.toFixed(2)),
+      distanceTraveled: 0,
       estimatedTime: Math.round(routeTime.estimatedMinutes),
       currentTime: 0,
       trafficLightsCleared: 0,
       totalTrafficLights: lightsOnRoute.length,
       congestionLevel,
+      currentSpeed: 0,
       averageSpeed: routeTime.effectiveSpeed,
       progress: 0
     });
 
-    startTimeRef.current = Date.now();
+    simulatedTimeRef.current = 0;
+    totalDistanceTraveledRef.current = 0;
     setIsSimulating(true);
     setIsPaused(false);
 
@@ -148,8 +205,8 @@ const AmbulanceSimulator = () => {
   };
 
   const resetSimulation = () => {
-    if (simulationIntervalRef.current) {
-      clearInterval(simulationIntervalRef.current);
+    if (simulationTimeoutRef.current) {
+      clearTimeout(simulationTimeoutRef.current);
     }
     setIsSimulating(false);
     setIsPaused(false);
@@ -158,80 +215,111 @@ const AmbulanceSimulator = () => {
     setDestinationHospital(null);
     setRouteMetrics(null);
     setCurrentRouteIndex(0);
+    simulatedTimeRef.current = 0;
+    totalDistanceTraveledRef.current = 0;
     setLogs([]);
     addLog('🔄 Simulação reiniciada');
   };
 
-  // Loop de simulação
-  useEffect(() => {
-    if (!isSimulating || isPaused || route.length === 0) return;
+  // Função para agendar o próximo movimento com timing realista
+  const scheduleNextMove = useCallback((fromIndex: number, currentRoute: [number, number][], congestion: 'low' | 'medium' | 'high') => {
+    if (fromIndex >= currentRoute.length - 1) {
+      setIsSimulating(false);
+      addLog('✅ CHEGADA AO DESTINO');
+      addLog(`🏥 Paciente entregue em ${destinationHospital?.name}`);
+      return;
+    }
 
-    simulationIntervalRef.current = setInterval(() => {
-      setCurrentRouteIndex(prev => {
-        const nextIndex = prev + 1;
-        
-        if (nextIndex >= route.length) {
-          setIsSimulating(false);
-          addLog('✅ CHEGADA AO DESTINO');
-          addLog(`🏥 Paciente entregue em ${destinationHospital?.name}`);
-          return prev;
-        }
-
-        // Atualizar posição da ambulância
-        setAmbulancePosition(route[nextIndex]);
-
-        // Calcular métricas em tempo real
-        const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
-        const progress = (nextIndex / (route.length - 1)) * 100;
-        
-        // Calcular distância percorrida
-        let distanceTraveled = 0;
-        for (let i = 0; i < nextIndex; i++) {
-          distanceTraveled += calculateHaversineDistance(route[i], route[i + 1]);
-        }
-
-        // Verificar semáforos passados
-        const clearedLights = trafficLightsOnRoute.filter(light => {
-          for (let i = 0; i <= nextIndex; i++) {
-            if (calculateHaversineDistance(route[i], light.coordinates) < 0.1) {
-              return true;
-            }
+    // Calcular distância do segmento atual
+    const segmentDistance = calculateHaversineDistance(currentRoute[fromIndex], currentRoute[fromIndex + 1]);
+    
+    // Verificar se está perto de um semáforo
+    const isNearTrafficLight = trafficLightsOnRoute.some(light => 
+      calculateHaversineDistance(currentRoute[fromIndex], light.coordinates) < 0.15
+    );
+    
+    // Calcular velocidade realista para este segmento
+    const currentSpeed = getRealisticAmbulanceSpeed(
+      fromIndex, 
+      currentRoute.length, 
+      congestion,
+      isNearTrafficLight
+    );
+    
+    // Calcular tempo para percorrer este segmento (em ms)
+    // Aplicamos o fator de simulationSpeed para acelerar/desacelerar
+    const segmentTimeMs = calculateSegmentTime(segmentDistance, currentSpeed) / simulationSpeed;
+    
+    // Atualizar tempo simulado (tempo real que levaria sem aceleração)
+    const realSegmentTimeSeconds = (segmentDistance / currentSpeed) * 3600;
+    
+    simulationTimeoutRef.current = setTimeout(() => {
+      if (isPaused) return;
+      
+      const nextIndex = fromIndex + 1;
+      
+      // Atualizar refs de tempo e distância
+      simulatedTimeRef.current += realSegmentTimeSeconds;
+      totalDistanceTraveledRef.current += segmentDistance;
+      
+      // Atualizar estado
+      setCurrentRouteIndex(nextIndex);
+      setAmbulancePosition(currentRoute[nextIndex]);
+      
+      // Calcular progresso
+      const progress = (nextIndex / (currentRoute.length - 1)) * 100;
+      
+      // Verificar semáforos passados
+      const clearedLights = trafficLightsOnRoute.filter(light => {
+        for (let i = 0; i <= nextIndex; i++) {
+          if (calculateHaversineDistance(currentRoute[i], light.coordinates) < 0.1) {
+            return true;
           }
-          return false;
-        }).length;
-
-        // Calcular velocidade média
-        const avgSpeed = elapsedSeconds > 0 
-          ? (distanceTraveled / (elapsedSeconds / 3600)) 
-          : 0;
-
-        setRouteMetrics(prev => prev ? {
-          ...prev,
-          currentTime: Math.round(elapsedSeconds / 60 * 10) / 10,
-          progress: Math.round(progress),
-          trafficLightsCleared: clearedLights,
-          averageSpeed: Math.round(avgSpeed)
-        } : null);
-
-        // Logs de progresso
-        if (nextIndex % 5 === 0 && nextIndex > 0) {
-          addLog(`📍 Progresso: ${Math.round(progress)}%`);
         }
+        return false;
+      }).length;
+      
+      // Calcular velocidade média real
+      const avgSpeed = simulatedTimeRef.current > 0 
+        ? (totalDistanceTraveledRef.current / (simulatedTimeRef.current / 3600))
+        : 0;
+      
+      // Atualizar métricas
+      setRouteMetrics(prev => prev ? {
+        ...prev,
+        distanceTraveled: Number(totalDistanceTraveledRef.current.toFixed(2)),
+        currentTime: Math.round(simulatedTimeRef.current / 60 * 10) / 10,
+        progress: Math.round(progress),
+        trafficLightsCleared: clearedLights,
+        currentSpeed: Math.round(currentSpeed),
+        averageSpeed: Math.round(avgSpeed)
+      } : null);
+      
+      // Logs de progresso
+      if (nextIndex % 5 === 0 && nextIndex > 0) {
+        addLog(`📍 Progresso: ${Math.round(progress)}% | Vel: ${Math.round(currentSpeed)} km/h`);
+      }
+      
+      // Agendar próximo movimento
+      scheduleNextMove(nextIndex, currentRoute, congestion);
+    }, Math.max(50, segmentTimeMs)); // Mínimo de 50ms para garantir renderização
+  }, [isPaused, simulationSpeed, trafficLightsOnRoute, destinationHospital, addLog]);
 
-        if (clearedLights > 0 && clearedLights !== prev) {
-          addLog(`🚦 Semáforo liberado (${clearedLights}/${trafficLightsOnRoute.length})`);
-        }
+  // Iniciar loop de simulação quando isSimulating muda
+  useEffect(() => {
+    if (!isSimulating || isPaused || route.length === 0) {
+      return;
+    }
 
-        return nextIndex;
-      });
-    }, 500 / simulationSpeed);
+    const congestion = routeMetrics?.congestionLevel || 'medium';
+    scheduleNextMove(currentRouteIndex, route, congestion);
 
     return () => {
-      if (simulationIntervalRef.current) {
-        clearInterval(simulationIntervalRef.current);
+      if (simulationTimeoutRef.current) {
+        clearTimeout(simulationTimeoutRef.current);
       }
     };
-  }, [isSimulating, isPaused, route, simulationSpeed, trafficLightsOnRoute, destinationHospital, addLog]);
+  }, [isSimulating, isPaused]);
 
   const getCongestionBadgeClass = (level: 'low' | 'medium' | 'high') => {
     switch (level) {
@@ -413,6 +501,13 @@ const AmbulanceSimulator = () => {
                   </span>
                   <span className="font-semibold">{routeMetrics.distance} km</span>
                 </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> Percorrido
+                  </span>
+                  <span className="font-semibold">{routeMetrics.distanceTraveled} km</span>
+                </div>
                 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
@@ -426,6 +521,13 @@ const AmbulanceSimulator = () => {
                     <Clock className="h-4 w-4" /> Tempo Atual
                   </span>
                   <span className="font-semibold">{routeMetrics.currentTime} min</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Gauge className="h-4 w-4 text-green-500" /> Velocidade Atual
+                  </span>
+                  <span className="font-semibold text-green-500">{routeMetrics.currentSpeed} km/h</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
