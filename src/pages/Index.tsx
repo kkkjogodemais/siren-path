@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import Hero from "@/components/Hero";
-import MapDemo from "@/components/MapDemo";
+import LiveDemoSimulation from "@/components/LiveDemoSimulation";
 import Features from "@/components/Features";
 import TechStack from "@/components/TechStack";
 import { Card } from "@/components/ui/card";
@@ -12,7 +12,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <Hero />
-      <MapDemo />
+      <LiveDemoSimulation />
       <Features />
       <TechStack />
       
