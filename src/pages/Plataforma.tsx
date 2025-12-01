@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Ambulance, MapPin, Clock, Radio, Shield, Activity } from 'lucide-react';
+import { ArrowLeft, Ambulance, MapPin, Clock, Radio, Shield as ShieldIcon, Activity, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -40,6 +40,12 @@ const Plataforma = () => {
               </div>
               
               <div className="flex items-center gap-3">
+                <Link to="/admin">
+                  <Button variant="outline" size="sm">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
                 <Badge variant="outline" className="hidden sm:flex">
                   <div className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse" />
                   Sistema Online
