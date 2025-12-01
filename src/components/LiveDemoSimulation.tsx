@@ -197,7 +197,9 @@ const LiveDemoSimulation = () => {
   }, []);
 
   // Função para avançar para o próximo ponto com timing realista
-  const scheduleNextMove = useCallback((fromIndex: number) => {
+  const scheduleNextMoveRef = useRef<((fromIndex: number) => void) | null>(null);
+  
+  scheduleNextMoveRef.current = (fromIndex: number) => {
     if (!isRunningRef.current || fromIndex >= DEMO_ROUTE.length - 1) {
       return;
     }
@@ -237,9 +239,9 @@ const LiveDemoSimulation = () => {
       }
       
       // Agendar próximo movimento
-      scheduleNextMove(nextIndex);
+      scheduleNextMoveRef.current?.(nextIndex);
     }, duration);
-  }, []);
+  };
 
   // Loop principal da simulação
   useEffect(() => {
@@ -253,14 +255,14 @@ const LiveDemoSimulation = () => {
     }, 100);
 
     // Iniciar a sequência de movimentos
-    scheduleNextMove(0);
+    scheduleNextMoveRef.current?.(0);
 
     return () => {
       isRunningRef.current = false;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRunning, scheduleNextMove]);
+  }, [isRunning]);
 
   return (
     <section className="py-20 bg-gradient-to-b from-background to-muted/30">
