@@ -123,7 +123,7 @@ const LiveDemoSimulation = () => {
   const [trafficLightsCleared, setTrafficLightsCleared] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
