@@ -14,10 +14,13 @@ import {
   Ambulance, 
   Building2,
   Timer,
-  ArrowRight
+  ArrowRight,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import RealtimeMap from '@/components/routing/RealtimeMap';
 import { hospitals, smartTrafficLights, Hospital } from '@/data/sorocabaData';
+import { useSimulationSounds } from '@/hooks/useSimulationSounds';
 
 // Rota realista pelas ruas de Sorocaba - do Centro ao Hospital Regional
 const DEMO_ROUTE: [number, number][] = [
@@ -120,10 +123,13 @@ const LiveDemoSimulation = () => {
   const [trafficLightsCleared, setTrafficLightsCleared] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isRunningRef = useRef(false);
+  
+  const { startSiren, stopSiren, playTrafficLightCleared, playArrival, playNotification } = useSimulationSounds();
 
   // Calcular métricas em tempo real
   const progress = (currentIndex / (DEMO_ROUTE.length - 1)) * 100;
@@ -145,13 +151,14 @@ const LiveDemoSimulation = () => {
     isRunningRef.current = false;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
+    stopSiren();
     setIsRunning(false);
     setCurrentIndex(0);
     setElapsedSeconds(0);
     setTrafficLightsCleared(0);
     setCurrentSpeed(0);
     setHasCompleted(false);
-  }, []);
+  }, [stopSiren]);
 
   // Iniciar simulação
   const startSimulation = useCallback(() => {
@@ -160,8 +167,12 @@ const LiveDemoSimulation = () => {
       isRunningRef.current = true;
       setIsRunning(true);
       setHasCompleted(false);
+      if (soundEnabled) {
+        startSiren();
+        playNotification('info');
+      }
     }, 50);
-  }, [resetSimulation]);
+  }, [resetSimulation, soundEnabled, startSiren, playNotification]);
 
   // Auto-start após 2 segundos
   useEffect(() => {
@@ -193,15 +204,22 @@ const LiveDemoSimulation = () => {
       const nextIndex = fromIndex + 1;
       setCurrentIndex(nextIndex);
       
-      // Verificar semáforos passados
+      // Verificar semáforos passados e tocar som
       if (nextIndex === 12 || nextIndex === 22 || nextIndex === 28 || nextIndex === 32) {
         setTrafficLightsCleared(t => Math.min(t + 1, SIMULATION_CONFIG.trafficLightsCount));
+        if (soundEnabled) {
+          playTrafficLightCleared();
+        }
       }
       
       // Verificar conclusão
       if (nextIndex >= DEMO_ROUTE.length - 1) {
         isRunningRef.current = false;
         if (timerRef.current) clearInterval(timerRef.current);
+        stopSiren();
+        if (soundEnabled) {
+          playArrival();
+        }
         setIsRunning(false);
         setHasCompleted(true);
         return;
@@ -210,7 +228,7 @@ const LiveDemoSimulation = () => {
       // Agendar próximo movimento
       scheduleNextMove(nextIndex);
     }, duration);
-  }, []);
+  }, [soundEnabled, playTrafficLightCleared, playArrival, stopSiren]);
 
   // Loop principal da simulação
   useEffect(() => {
@@ -416,7 +434,27 @@ const LiveDemoSimulation = () => {
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
+                <Button 
+                  variant={soundEnabled ? "default" : "outline"}
+                  onClick={() => {
+                    setSoundEnabled(!soundEnabled);
+                    if (soundEnabled) {
+                      stopSiren();
+                    } else if (isRunning) {
+                      startSiren();
+                    }
+                  }}
+                  className={soundEnabled ? "bg-red-500 hover:bg-red-600" : ""}
+                >
+                  {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                </Button>
               </div>
+              
+              {soundEnabled && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Sirene e notificações ativas
+                </p>
+              )}
               
               <div className="mt-4 text-center">
                 <Link to="/plataforma">
