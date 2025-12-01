@@ -128,8 +128,19 @@ const LiveDemoSimulation = () => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isRunningRef = useRef(false);
+  const soundEnabledRef = useRef(soundEnabled);
   
-  const { startSiren, stopSiren, playTrafficLightCleared, playArrival, playNotification } = useSimulationSounds();
+  const sounds = useSimulationSounds();
+  const soundsRef = useRef(sounds);
+  
+  // Manter refs atualizados
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+  
+  useEffect(() => {
+    soundsRef.current = sounds;
+  }, [sounds]);
 
   // Calcular métricas em tempo real
   const progress = (currentIndex / (DEMO_ROUTE.length - 1)) * 100;
@@ -151,14 +162,14 @@ const LiveDemoSimulation = () => {
     isRunningRef.current = false;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
-    stopSiren();
+    soundsRef.current.stopSiren();
     setIsRunning(false);
     setCurrentIndex(0);
     setElapsedSeconds(0);
     setTrafficLightsCleared(0);
     setCurrentSpeed(0);
     setHasCompleted(false);
-  }, [stopSiren]);
+  }, []);
 
   // Iniciar simulação
   const startSimulation = useCallback(() => {
@@ -167,12 +178,12 @@ const LiveDemoSimulation = () => {
       isRunningRef.current = true;
       setIsRunning(true);
       setHasCompleted(false);
-      if (soundEnabled) {
-        startSiren();
-        playNotification('info');
+      if (soundEnabledRef.current) {
+        soundsRef.current.startSiren();
+        soundsRef.current.playNotification('info');
       }
     }, 50);
-  }, [resetSimulation, soundEnabled, startSiren, playNotification]);
+  }, [resetSimulation]);
 
   // Auto-start após 2 segundos
   useEffect(() => {
@@ -207,8 +218,8 @@ const LiveDemoSimulation = () => {
       // Verificar semáforos passados e tocar som
       if (nextIndex === 12 || nextIndex === 22 || nextIndex === 28 || nextIndex === 32) {
         setTrafficLightsCleared(t => Math.min(t + 1, SIMULATION_CONFIG.trafficLightsCount));
-        if (soundEnabled) {
-          playTrafficLightCleared();
+        if (soundEnabledRef.current) {
+          soundsRef.current.playTrafficLightCleared();
         }
       }
       
@@ -216,9 +227,9 @@ const LiveDemoSimulation = () => {
       if (nextIndex >= DEMO_ROUTE.length - 1) {
         isRunningRef.current = false;
         if (timerRef.current) clearInterval(timerRef.current);
-        stopSiren();
-        if (soundEnabled) {
-          playArrival();
+        soundsRef.current.stopSiren();
+        if (soundEnabledRef.current) {
+          soundsRef.current.playArrival();
         }
         setIsRunning(false);
         setHasCompleted(true);
@@ -228,7 +239,7 @@ const LiveDemoSimulation = () => {
       // Agendar próximo movimento
       scheduleNextMove(nextIndex);
     }, duration);
-  }, [soundEnabled, playTrafficLightCleared, playArrival, stopSiren]);
+  }, []);
 
   // Loop principal da simulação
   useEffect(() => {
@@ -439,9 +450,9 @@ const LiveDemoSimulation = () => {
                   onClick={() => {
                     setSoundEnabled(!soundEnabled);
                     if (soundEnabled) {
-                      stopSiren();
+                      soundsRef.current.stopSiren();
                     } else if (isRunning) {
-                      startSiren();
+                      soundsRef.current.startSiren();
                     }
                   }}
                   className={soundEnabled ? "bg-red-500 hover:bg-red-600" : ""}
