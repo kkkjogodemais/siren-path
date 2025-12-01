@@ -24,15 +24,16 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import RealtimeMap from './RealtimeMap';
+import TrafficPanel from './TrafficPanel';
+import { useTrafficData } from '@/hooks/useTrafficData';
+import { calculateRouteTimeWithTraffic } from '@/services/trafficSimulationService';
 import {
   hospitals,
   smartTrafficLights,
   neighborhoods,
   Hospital,
   calculateHaversineDistance,
-  calculateEstimatedTime,
   generateRealisticRoute,
-  findNearestHospital,
   getTrafficLightsOnRoute
 } from '@/data/sorocabaData';
 
@@ -64,17 +65,21 @@ const AmbulanceSimulator = () => {
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
 
+  // Hook de dados de tráfego em tempo real
+  const { trafficData, isLoading: isTrafficLoading, lastUpdate, refreshData, simulateSpike } = useTrafficData({
+    autoUpdate: true,
+    updateInterval: 5000
+  });
+
   const addLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString('pt-BR');
     setLogs(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
   }, []);
 
-  const getCongestionLevel = (): 'low' | 'medium' | 'high' => {
-    const hour = new Date().getHours();
-    if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
-      return Math.random() > 0.5 ? 'high' : 'medium';
-    }
-    return Math.random() > 0.7 ? 'medium' : 'low';
+  // Converte nível de congestionamento do traffic service para o formato local
+  const getCongestionLevelFromTraffic = (): 'low' | 'medium' | 'high' => {
+    if (trafficData.congestionLevel === 'critical') return 'high';
+    return trafficData.congestionLevel as 'low' | 'medium' | 'high';
   };
 
   const startSimulation = useCallback(() => {
@@ -100,25 +105,25 @@ const AmbulanceSimulator = () => {
     setAmbulancePosition(newRoute[0]);
     setCurrentRouteIndex(0);
 
-    // Calcular métricas
+    // Calcular métricas usando dados de tráfego em tempo real
     const distance = newRoute.reduce((total, point, i) => {
       if (i === 0) return 0;
       return total + calculateHaversineDistance(newRoute[i - 1], point);
     }, 0);
 
-    const congestionLevel = getCongestionLevel();
-    const estimatedTime = calculateEstimatedTime(distance, congestionLevel, true);
+    const congestionLevel = getCongestionLevelFromTraffic();
+    const routeTime = calculateRouteTimeWithTraffic(distance, trafficData, true);
     const lightsOnRoute = getTrafficLightsOnRoute(newRoute);
 
     setTrafficLightsOnRoute(lightsOnRoute);
     setRouteMetrics({
       distance: Number(distance.toFixed(2)),
-      estimatedTime: Math.round(estimatedTime),
+      estimatedTime: Math.round(routeTime.estimatedMinutes),
       currentTime: 0,
       trafficLightsCleared: 0,
       totalTrafficLights: lightsOnRoute.length,
       congestionLevel,
-      averageSpeed: 0,
+      averageSpeed: routeTime.effectiveSpeed,
       progress: 0
     });
 
@@ -129,8 +134,13 @@ const AmbulanceSimulator = () => {
     addLog(`🚨 CHAMADO RECEBIDO - ${selectedOrigin}`);
     addLog(`🏥 Destino: ${destHospital.name}`);
     addLog(`📍 Distância: ${distance.toFixed(2)} km`);
-    addLog(`⏱️ Tempo estimado: ${Math.round(estimatedTime)} min`);
-  }, [selectedOrigin, selectedDestination, addLog]);
+    addLog(`⏱️ Tempo estimado: ${Math.round(routeTime.estimatedMinutes)} min`);
+    addLog(`🚗 Tráfego: ${trafficData.congestionLevel} (${trafficData.overallCongestion}%)`);
+    
+    if (trafficData.incidents.length > 0) {
+      addLog(`⚠️ ${trafficData.incidents.length} incidente(s) na região`);
+    }
+  }, [selectedOrigin, selectedDestination, addLog, trafficData]);
 
   const pauseSimulation = () => {
     setIsPaused(!isPaused);
@@ -232,226 +242,257 @@ const AmbulanceSimulator = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Mapa Principal */}
-      <div className="lg:col-span-2">
-        <Card className="overflow-hidden h-[650px] relative">
-          <RealtimeMap
-            route={route}
-            hospitals={hospitals}
-            trafficLights={trafficLightsOnRoute}
-            ambulancePosition={ambulancePosition}
-            destinationHospital={destinationHospital}
-          />
-          
-          {/* Overlay de Status */}
-          {isSimulating && routeMetrics && (
-            <div className="absolute top-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm font-semibold">Ambulância em trânsito</span>
-              </div>
-              <Progress value={routeMetrics.progress} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                {routeMetrics.progress}% concluído
-              </p>
-            </div>
-          )}
-
-          {/* Legenda */}
-          <div className="absolute bottom-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
-            <p className="text-xs font-semibold mb-2">Legenda</p>
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <span>🚑</span><span>Ambulância</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>🏥</span><span>UPA</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>🏨</span><span>Hospital</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span>Semáforo Inteligente</span>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Painel de Controle */}
-      <div className="space-y-4">
-        {/* Configuração */}
-        <Card className="p-4">
-          <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <Navigation className="h-5 w-5 text-primary" />
-            Configurar Rota
-          </h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">
-                Origem (Localização da Emergência)
-              </label>
-              <Select value={selectedOrigin} onValueChange={setSelectedOrigin}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o bairro" />
-                </SelectTrigger>
-                <SelectContent>
-                  {neighborhoods.map(n => (
-                    <SelectItem key={n.name} value={n.name}>
-                      {n.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">
-                Destino (Hospital)
-              </label>
-              <Select value={selectedDestination} onValueChange={setSelectedDestination}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o hospital" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hospitals.map(h => (
-                    <SelectItem key={h.id} value={h.id}>
-                      {h.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">
-                Velocidade da Simulação
-              </label>
-              <Select 
-                value={simulationSpeed.toString()} 
-                onValueChange={(v) => setSimulationSpeed(Number(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0.5">0.5x (Lento)</SelectItem>
-                  <SelectItem value="1">1x (Normal)</SelectItem>
-                  <SelectItem value="2">2x (Rápido)</SelectItem>
-                  <SelectItem value="4">4x (Muito Rápido)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button 
-                onClick={startSimulation} 
-                disabled={isSimulating || !selectedOrigin || !selectedDestination}
-                className="flex-1"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Iniciar
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={pauseSimulation}
-                disabled={!isSimulating}
-              >
-                {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-              </Button>
-              <Button variant="outline" onClick={resetSimulation}>
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Métricas em Tempo Real */}
-        {routeMetrics && (
-          <Card className="p-4">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Métricas em Tempo Real
-            </h3>
+    <div className="space-y-6">
+      {/* Layout Principal */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 gap-6">
+        {/* Mapa Principal */}
+        <div className="xl:col-span-2 lg:col-span-2">
+          <Card className="overflow-hidden h-[650px] relative">
+            <RealtimeMap
+              route={route}
+              hospitals={hospitals}
+              trafficLights={trafficLightsOnRoute}
+              ambulancePosition={ambulancePosition}
+              destinationHospital={destinationHospital}
+            />
             
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> Distância Total
-                </span>
-                <span className="font-semibold">{routeMetrics.distance} km</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4" /> Tempo Estimado
-                </span>
-                <span className="font-semibold">{routeMetrics.estimatedTime} min</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4" /> Tempo Atual
-                </span>
-                <span className="font-semibold">{routeMetrics.currentTime} min</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Gauge className="h-4 w-4" /> Velocidade Média
-                </span>
-                <span className="font-semibold">{routeMetrics.averageSpeed} km/h</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Radio className="h-4 w-4" /> Semáforos
-                </span>
-                <span className="font-semibold">
-                  {routeMetrics.trafficLightsCleared}/{routeMetrics.totalTrafficLights}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" /> Congestionamento
-                </span>
-                <Badge className={getCongestionBadgeClass(routeMetrics.congestionLevel)}>
-                  {routeMetrics.congestionLevel === 'low' ? 'Baixo' : 
-                   routeMetrics.congestionLevel === 'medium' ? 'Médio' : 'Alto'}
-                </Badge>
-              </div>
-
-              <div className="pt-2 border-t">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm text-muted-foreground">Progresso</span>
-                  <span className="font-semibold">{routeMetrics.progress}%</span>
+            {/* Overlay de Status */}
+            {isSimulating && routeMetrics && (
+              <div className="absolute top-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm font-semibold">Ambulância em trânsito</span>
                 </div>
                 <Progress value={routeMetrics.progress} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {routeMetrics.progress}% concluído
+                </p>
+              </div>
+            )}
+
+            {/* Indicador de Tráfego no Mapa */}
+            <div className="absolute top-4 right-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full animate-pulse"
+                  style={{ 
+                    backgroundColor: trafficData.congestionLevel === 'low' ? '#22c55e' :
+                                     trafficData.congestionLevel === 'medium' ? '#eab308' :
+                                     trafficData.congestionLevel === 'high' ? '#f97316' : '#ef4444'
+                  }}
+                />
+                <span className="text-xs font-medium">
+                  Tráfego: {trafficData.overallCongestion}%
+                </span>
+              </div>
+            </div>
+
+            {/* Legenda */}
+            <div className="absolute bottom-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+              <p className="text-xs font-semibold mb-2">Legenda</p>
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <span>🚑</span><span>Ambulância</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>🏥</span><span>UPA</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>🏨</span><span>Hospital</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span>Semáforo Inteligente</span>
+                </div>
               </div>
             </div>
           </Card>
-        )}
+        </div>
 
-        {/* Log de Eventos */}
-        <Card className="p-4">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-primary" />
-            Log de Eventos
-          </h3>
-          <div className="space-y-1 max-h-40 overflow-y-auto text-xs font-mono">
-            {logs.length === 0 ? (
-              <p className="text-muted-foreground">Aguardando início...</p>
-            ) : (
-              logs.map((log, i) => (
-                <p key={i} className="text-muted-foreground">{log}</p>
-              ))
-            )}
-          </div>
-        </Card>
+        {/* Painel de Controle */}
+        <div className="space-y-4">
+          {/* Configuração */}
+          <Card className="p-4">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Navigation className="h-5 w-5 text-primary" />
+              Configurar Rota
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  Origem (Localização da Emergência)
+                </label>
+                <Select value={selectedOrigin} onValueChange={setSelectedOrigin}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o bairro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {neighborhoods.map(n => (
+                      <SelectItem key={n.name} value={n.name}>
+                        {n.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  Destino (Hospital)
+                </label>
+                <Select value={selectedDestination} onValueChange={setSelectedDestination}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o hospital" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hospitals.map(h => (
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  Velocidade da Simulação
+                </label>
+                <Select 
+                  value={simulationSpeed.toString()} 
+                  onValueChange={(v) => setSimulationSpeed(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0.5">0.5x (Lento)</SelectItem>
+                    <SelectItem value="1">1x (Normal)</SelectItem>
+                    <SelectItem value="2">2x (Rápido)</SelectItem>
+                    <SelectItem value="4">4x (Muito Rápido)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={startSimulation} 
+                  disabled={isSimulating || !selectedOrigin || !selectedDestination}
+                  className="flex-1"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Iniciar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={pauseSimulation}
+                  disabled={!isSimulating}
+                >
+                  {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                </Button>
+                <Button variant="outline" onClick={resetSimulation}>
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Métricas em Tempo Real */}
+          {routeMetrics && (
+            <Card className="p-4">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Métricas em Tempo Real
+              </h3>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> Distância Total
+                  </span>
+                  <span className="font-semibold">{routeMetrics.distance} km</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Tempo Estimado
+                  </span>
+                  <span className="font-semibold">{routeMetrics.estimatedTime} min</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Tempo Atual
+                  </span>
+                  <span className="font-semibold">{routeMetrics.currentTime} min</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Gauge className="h-4 w-4" /> Velocidade Média
+                  </span>
+                  <span className="font-semibold">{routeMetrics.averageSpeed} km/h</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Radio className="h-4 w-4" /> Semáforos
+                  </span>
+                  <span className="font-semibold">
+                    {routeMetrics.trafficLightsCleared}/{routeMetrics.totalTrafficLights}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" /> Congestionamento
+                  </span>
+                  <Badge className={getCongestionBadgeClass(routeMetrics.congestionLevel)}>
+                    {routeMetrics.congestionLevel === 'low' ? 'Baixo' : 
+                     routeMetrics.congestionLevel === 'medium' ? 'Médio' : 'Alto'}
+                  </Badge>
+                </div>
+
+                <div className="pt-2 border-t">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-muted-foreground">Progresso</span>
+                    <span className="font-semibold">{routeMetrics.progress}%</span>
+                  </div>
+                  <Progress value={routeMetrics.progress} className="h-2" />
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Log de Eventos */}
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Log de Eventos
+            </h3>
+            <div className="space-y-1 max-h-40 overflow-y-auto text-xs font-mono">
+              {logs.length === 0 ? (
+                <p className="text-muted-foreground">Aguardando início...</p>
+              ) : (
+                logs.map((log, i) => (
+                  <p key={i} className="text-muted-foreground">{log}</p>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Painel de Tráfego em Tempo Real */}
+        <div className="xl:col-span-1 lg:col-span-3 xl:order-none lg:order-first">
+          <TrafficPanel
+            trafficData={trafficData}
+            isLoading={isTrafficLoading}
+            lastUpdate={lastUpdate}
+            onRefresh={refreshData}
+            onSimulateSpike={simulateSpike}
+          />
+        </div>
       </div>
     </div>
   );
